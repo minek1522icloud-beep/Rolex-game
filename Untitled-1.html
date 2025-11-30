@@ -1,0 +1,1747 @@
+<!DOCTYPE html><!-- MUZYKA WYGRANA / PRZEGRANA / REMIS -->
+<audio id="winSound">
+  <source src="win.mp3" type="audio/mpeg">
+</audio>
+<audio id="loseSound">
+  <source src="lose.mp3" type="audio/mpeg">
+</audio>
+<audio id="drawSound">
+  <source src="draw.mp3" type="audio/mpeg">
+</audio>
+
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Rolex – Szachy, Warcaby, Chińczyk</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #20232a;
+      color: #fff;
+      margin: 0;
+      padding: 20px;
+    }
+
+    /* === LOADER === */
+    #loader {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at top, #1e88e5, #0d1117);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 3000;
+      color: #fff;
+      font-family: Arial;
+    }
+    #loaderContent {
+      background: rgba(0,0,0,0.6);
+      padding: 22px;
+      border-radius: 12px;
+      text-align: center;
+      width: 280px;
+    }
+    #loaderTop {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      justify-content: center;
+      margin-bottom: 8px;
+    }
+    #loaderTop img {
+      width: 32px;
+      height: 32px;
+    }
+    .loaderSpinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #61dafb;
+      border-top-color: transparent;
+      border-radius: 50%;
+      margin: 0 auto 6px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* pasek ładowania */
+    #loaderBarOuter {
+      margin-top: 8px;
+      width: 100%;
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.12);
+      overflow: hidden;
+    }
+    #loaderBarInner {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg,#00e676,#1de9b6,#00b0ff);
+      transition: width 0.08s linear;
+    }
+
+    #btnStartGame {
+      margin-top: 12px;
+      padding: 8px 18px;
+      border-radius: 999px;
+      border: none;
+      background: #4caf50;
+      color: #fff;
+      cursor: not-allowed;
+      font-weight: bold;
+      opacity: 0.6;
+    }
+    #btnStartGame.ready {
+      cursor: pointer;
+      opacity: 1;
+    }
+
+    /* === MUZYKA === */
+    #btnMusicToggle {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 2000;
+      background: #2e7d32;
+      color: #fff;
+      padding: 6px 10px;
+      border-radius: 4px;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    /* === ANIMOWANE WEJŚCIE GRY === */
+    #gameRoot {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: 0.6s ease;
+    }
+    #gameRoot.game-visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* === OVERLAY WYNIK + KONFETTI === */
+    #resultOverlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.85);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2500;
+      color: #fff;
+    }
+    #resultBox {
+      background: #1f2933;
+      padding: 20px 28px;
+      border-radius: 12px;
+      text-align: center;
+      width: 270px;
+    }
+    #resultIcon {
+      font-size: 52px;
+      margin-bottom: 4px;
+    }
+    #btnResultOk {
+      padding: 6px 16px;
+      margin-top: 10px;
+      border-radius: 6px;
+      border: none;
+      background: #61dafb;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .confetti-piece {
+      position: fixed;
+      width: 8px;
+      height: 14px;
+      background: red;
+      top: -10px;
+      opacity: 0.9;
+      z-index: 2600;
+      pointer-events: none;
+      animation: confetti-fall 2.5s linear forwards;
+    }
+    @keyframes confetti-fall {
+      0% { transform: translateY(0) rotate(0deg); }
+      100% { transform: translateY(110vh) rotate(720deg); }
+    }
+
+    /* === RESZTA STYLÓW GRY === */
+    h1 {
+      margin-top: 0;
+      text-align: center;
+    }
+    #controls, #modeControls, #rulesControls {
+      margin-bottom: 10px;
+      text-align: center;
+    }
+    button {
+      margin: 3px 5px;
+      padding: 8px 14px;
+      border: none;
+      border-radius: 4px;
+      background: #61dafb;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    button.active {
+      background: #21a1f1;
+      color: #fff;
+    }
+    canvas {
+      border: 2px solid #fff;
+      background: #f0f0f0;
+      display: block;
+    }
+    #info {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #ddd;
+      text-align: center;
+      max-width: 700px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    #turnInfo {
+      margin: 5px 0 10px;
+      font-size: 16px;
+      text-align: center;
+    }
+    #rulesBox {
+      margin-top: 10px;
+      padding: 12px;
+      max-width: 700px;
+      background: #333;
+      border: 2px solid #999;
+      display: none;
+      font-size: 14px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    #rulesBox h2 {
+      margin-top: 0;
+    }
+    #playArea {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-top: 5px;
+      justify-content: center;
+    }
+    #sidePanel {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      min-width: 160px;
+    }
+    #btnResign {
+      margin: 0 0 10px 0;
+      width: 140px;
+      background: #ff4d4d;
+      color: #fff;
+    }
+    #btnResign:hover {
+      background: #e03434;
+    }
+    #ludoModes {
+      margin-top: 4px;
+      display: none;
+      font-size: 13px;
+      background:#262c34;
+      padding:8px;
+      border-radius:6px;
+      border:1px solid #444;
+    }
+    #ludoModes h3 {
+      margin:4px 0;
+      font-size:13px;
+    }
+    #ludoModes button {
+      width: 140px;
+      padding:6px 8px;
+      font-size:12px;
+    }
+
+    /* ===== PANEL ZNAJOMYCH ===== */
+    #btnFriends {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: #ffb300;
+      color: #111;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 13px;
+      z-index: 2000;
+    }
+    #btnFriends:hover {
+      background: #ffa000;
+    }
+    #friendsPanel {
+      position: fixed;
+      top: 45px;
+      right: 10px;
+      width: 230px;
+      background: #1e232b;
+      border-radius: 6px;
+      border: 1px solid #555;
+      padding: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.6);
+      display: none;
+      z-index: 2100;
+      font-size: 13px;
+    }
+    #friendsPanel h3 {
+      margin: 0 0 6px 0;
+      font-size: 14px;
+      text-align: center;
+    }
+    #friendsList {
+      max-height: 160px;
+      overflow-y: auto;
+      margin-bottom: 6px;
+      border: 1px solid #444;
+      padding: 4px;
+      border-radius: 4px;
+      background: #111827;
+    }
+    #friendsList p {
+      margin: 0;
+      font-size: 12px;
+      color: #aaa;
+    }
+    .friend-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 2px 0;
+      border-bottom: 1px solid #333;
+      font-size: 12px;
+    }
+    .friend-item:last-child {
+      border-bottom: none;
+    }
+    .friend-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 130px;
+    }
+    .friend-remove {
+      background: #ff4d4d;
+      color: #fff;
+      border-radius: 3px;
+      padding: 2px 6px;
+      font-size: 11px;
+      margin: 0;
+    }
+    .friend-remove:hover {
+      background:#e03434;
+    }
+    #friendAddRow {
+      display: flex;
+      gap: 4px;
+      margin: 4px 0;
+    }
+    #friendNameInput {
+      flex: 1;
+      padding: 3px 5px;
+      border-radius: 4px;
+      border: 1px solid #555;
+      background:#111827;
+      color:#fff;
+      font-size: 12px;
+    }
+    #btnAddFriend {
+      padding: 3px 6px;
+      font-size: 12px;
+    }
+    #friendsPanelFooter {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 4px;
+      font-size: 11px;
+      color:#bbb;
+    }
+    #btnCloseFriends {
+      background:#444;
+      color:#fff;
+      padding:2px 6px;
+      font-size:11px;
+      border-radius:4px;
+      margin:0;
+    }
+    #btnCloseFriends:hover {
+      background:#666;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- LOADER -->
+  <div id="loader">
+    <div id="loaderContent">
+      <div id="loaderTop">
+        <img src="https://code.visualstudio.com/assets/images/code-stable.png" alt="VSCode">
+        <span>Tworzone w Visual Studio Code</span>
+      </div>
+      <div class="loaderSpinner"></div>
+      <p>Ładowanie Rolex...</p>
+
+      <!-- Pasek ładowania -->
+      <div id="loaderBarOuter">
+        <div id="loaderBarInner"></div>
+      </div>
+
+      <!-- Napis Twórca (zmieniany na telefonie) -->
+      <div id="creatorLabel" style="margin-top:6px;">
+        Twórca: <b>Marcel Kostecki</b>
+      </div>
+
+      <button id="btnStartGame">ŁADOWANIE...</button>
+    </div>
+  </div>
+
+  <!-- MUZYKA W TLE -->
+  <audio id="bgMusic" loop>
+    <!-- Dodaj plik bg-music.mp3 obok tego HTML -->
+    <source src="bg-music.mp3" type="audio/mpeg">
+  </audio>
+  <button id="btnMusicToggle">🔊 Muzyka</button>
+
+  <!-- DŹWIĘKI WYNIKU -->
+  <audio id="sfxWin">
+    <source src="sfx-win.mp3" type="audio/mpeg">
+  </audio>
+  <audio id="sfxLose">
+    <source src="sfx-lose.mp3" type="audio/mpeg">
+  </audio>
+  <audio id="sfxDraw">
+    <source src="sfx-draw.mp3" type="audio/mpeg">
+  </audio>
+
+  <!-- OVERLAY WYNIK -->
+  <div id="resultOverlay">
+    <div id="resultBox">
+      <div id="resultIcon">👑</div>
+      <h2 id="resultTitle">Wynik</h2>
+      <p id="resultText"></p>
+      <button id="btnResultOk">OK</button>
+    </div>
+  </div>
+
+  <!-- GŁÓWNY ROOT GRY (do animowanego wejścia) -->
+  <div id="gameRoot">
+    <h1>Rolex – Szachy, Warcaby, Chińczyk</h1>
+
+    <!-- PRZYCISK ZNAJOMI -->
+    <button id="btnFriends">👥 Znajomi</button>
+    <div id="friendsPanel">
+      <h3>Twoi znajomi</h3>
+      <div id="friendsList">
+        <p>Brak znajomych. Dodaj kogoś 👇</p>
+      </div>
+      <div id="friendAddRow">
+        <input id="friendNameInput" type="text" placeholder="Nick znajomego">
+        <button id="btnAddFriend">Dodaj</button>
+      </div>
+      <div id="friendsPanelFooter">
+        <span id="friendsCount">0 znajomych</span>
+        <button id="btnCloseFriends">Zamknij</button>
+      </div>
+    </div>
+
+    <div id="controls">
+      <button id="btnChess" class="active">Szachy</button>
+      <button id="btnCheckers">Warcaby</button>
+      <button id="btnLudo">Chińczyk</button>
+    </div>
+
+    <div id="modeControls">
+      <button id="btnPvp" class="active">Gracz vs Gracz</button>
+      <button id="btnPve">Gracz vs Bot</button>
+    </div>
+
+    <div id="rulesControls">
+      <button id="btnRulesChess">Zasady Szachów</button>
+      <button id="btnRulesCheckers">Zasady Warcabów</button>
+      <button id="btnRulesLudo">Zasady Chińczyka</button>
+    </div>
+
+    <div id="rulesBox"></div>
+    <div id="turnInfo"></div>
+
+    <div id="playArea">
+      <canvas id="board" width="600" height="600"></canvas>
+      <div id="sidePanel">
+        <button id="btnResign">PODDAJ SIĘ</button>
+
+        <div id="ludoModes">
+          <h3>Chińczyk – gracze</h3>
+          <button id="lmP4">1v1v1v1</button>
+          <button id="lmP3">1v1v1</button>
+          <button id="lmP2">1v1</button>
+          <h3 style="margin-top:8px;">Chińczyk – z botami</h3>
+          <button id="lmB4">Boty 1v1v1v1</button>
+          <button id="lmB3">Boty 1v1v1</button>
+          <button id="lmB2">Boty 1v1</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="info">
+      Kliknij figurę/pionek, potem pole docelowe, aby ją przenieść.<br>
+      Szachy pilnują zasad: pionek NIE bije do przodu, króla nie możesz zostawić pod szachem. Jest SZACH, SZACH MAT i PAT.<br>
+      W Warcabach obowiązuje bicie, damki itd.<br>
+      W Chińczyku: wyjście z bazy tylko na 1 lub 6, wejście na pionek przeciwnika odsyła go do bazy, boty same rzucają kostką.<br>
+      Wygrana / przegrana / remis pokaże się na ekranie z koroną lub smutną buźką + konfetti + dźwięk.<br>
+      Nie możesz zmienić gry ani trybu w trakcie rundy – użyj „PODDAJ SIĘ”.
+    </div>
+  </div> <!-- /gameRoot -->
+
+  <script>
+    /* ========== LOADER + MUZYKA + WYNIKI ========== */
+    const loader = document.getElementById('loader');
+    const btnStartGame = document.getElementById('btnStartGame');
+    const gameRoot = document.getElementById('gameRoot');
+    const loaderBarInner = document.getElementById('loaderBarInner');
+    const creatorLabel = document.getElementById('creatorLabel');
+
+    const bgMusic = document.getElementById('bgMusic');
+    const btnMusicToggle = document.getElementById('btnMusicToggle');
+    let musicEnabled = true;
+
+    const resultOverlay = document.getElementById('resultOverlay');
+    const resultIcon = document.getElementById('resultIcon');
+    const resultTitle = document.getElementById('resultTitle');
+    const resultText = document.getElementById('resultText');
+    const btnResultOk = document.getElementById('btnResultOk');
+
+    const sfxWin = document.getElementById('sfxWin');
+    const sfxLose = document.getElementById('sfxLose');
+    const sfxDraw = document.getElementById('sfxDraw');
+
+    // Pasek ładowania (około 3 sekundy)
+    let loaderProgress = 0;
+    btnStartGame.disabled = true;
+
+    const loaderTimer = setInterval(() => {
+      loaderProgress += 2; // 2% co 60ms → ~3s
+      if (loaderProgress > 100) loaderProgress = 100;
+      loaderBarInner.style.width = loaderProgress + '%';
+      if (loaderProgress >= 100) {
+        clearInterval(loaderTimer);
+        btnStartGame.disabled = false;
+        btnStartGame.classList.add('ready');
+        btnStartGame.textContent = 'START';
+      }
+    }, 60);
+
+    // Zmiana napisu "Twórca" na telefonie
+    function adjustCreatorLabel() {
+      if (window.innerWidth <= 768) {
+        // wersja na telefonie: dokładnie "Twórca Marcel Kostecki"
+        creatorLabel.textContent = 'Twórca Marcel Kostecki';
+      } else {
+        // wersja na PC z dwukropkiem i pogrubieniem
+        creatorLabel.innerHTML = 'Twórca: <b>Marcel Kostecki</b>';
+      }
+    }
+    adjustCreatorLabel();
+    window.addEventListener('resize', adjustCreatorLabel);
+
+    function spawnConfetti() {
+      const colors = ['#ff5252','#ffeb3b','#4caf50','#2196f3','#ff9800','#e040fb'];
+      for (let i = 0; i < 140; i++) {
+        const div = document.createElement('div');
+        div.className = 'confetti-piece';
+        div.style.left = Math.random() * 100 + 'vw';
+        div.style.backgroundColor = colors[Math.floor(Math.random()*colors.length)];
+        div.style.animationDelay = (Math.random() * 0.8) + 's';
+        document.body.appendChild(div);
+        setTimeout(() => div.remove(), 3000);
+      }
+    }
+
+    function playSfx(el) {
+      if (!el) return;
+      try {
+        el.currentTime = 0;
+        el.play().catch(()=>{});
+      } catch(e) {}
+    }
+
+    function showResult(type, msg) {
+      if (type === 'win') {
+        resultIcon.textContent = '👑';
+        resultTitle.textContent = 'Wygrałeś!';
+        spawnConfetti();
+        playSfx(sfxWin);
+      } else if (type === 'lose') {
+        resultIcon.textContent = '💔';
+        resultTitle.textContent = 'Przegrałeś';
+        playSfx(sfxLose);
+      } else {
+        resultIcon.textContent = '🤝';
+        resultTitle.textContent = 'Remis';
+        playSfx(sfxDraw);
+      }
+      resultText.textContent = msg || '';
+      resultOverlay.style.display = 'flex';
+      gameLocked = false;
+    }
+
+    btnResultOk.addEventListener('click', () => {
+      resultOverlay.style.display = 'none';
+    });
+
+    btnStartGame.addEventListener('click', () => {
+      if (btnStartGame.disabled) return;
+      loader.style.display = 'none';
+      gameRoot.classList.add('game-visible');
+      if (musicEnabled) {
+        bgMusic.play().catch(()=>{});
+      }
+    });
+
+    btnMusicToggle.addEventListener('click', () => {
+      if (bgMusic.paused) {
+        bgMusic.play().catch(()=>{});
+        btnMusicToggle.textContent = '🔊 Muzyka';
+        musicEnabled = true;
+      } else {
+        bgMusic.pause();
+        btnMusicToggle.textContent = '🔈 Muzyka';
+        musicEnabled = false;
+      }
+    });
+
+    /* ========== GŁÓWNE ZMIENNE GRY ========== */
+    const canvas = document.getElementById('board');
+    const ctx = canvas.getContext('2d');
+    const size = 600;
+    const grid8 = 8;
+    const cell8 = size / grid8;
+
+    let currentGame = 'chess'; // 'chess' | 'checkers' | 'ludo'
+    let boardState = [];
+    let selected = null;
+
+    const btnChess = document.getElementById('btnChess');
+    const btnCheckers = document.getElementById('btnCheckers');
+    const btnLudo = document.getElementById('btnLudo');
+
+    const btnPvp = document.getElementById('btnPvp');
+    const btnPve = document.getElementById('btnPve');
+    const turnInfo = document.getElementById('turnInfo');
+
+    const btnResign = document.getElementById('btnResign');
+
+    const ludoModesDiv = document.getElementById('ludoModes');
+    const lmP4 = document.getElementById('lmP4');
+    const lmP3 = document.getElementById('lmP3');
+    const lmP2 = document.getElementById('lmP2');
+    const lmB4 = document.getElementById('lmB4');
+    const lmB3 = document.getElementById('lmB3');
+    const lmB2 = document.getElementById('lmB2');
+
+    const btnRulesChess = document.getElementById('btnRulesChess');
+    const btnRulesCheckers = document.getElementById('btnRulesCheckers');
+    const btnRulesLudo = document.getElementById('btnRulesLudo');
+    const rulesBox = document.getElementById('rulesBox');
+
+    // ZNAJOMI
+    const btnFriends = document.getElementById('btnFriends');
+    const friendsPanel = document.getElementById('friendsPanel');
+    const friendsListDiv = document.getElementById('friendsList');
+    const friendNameInput = document.getElementById('friendNameInput');
+    const btnAddFriend = document.getElementById('btnAddFriend');
+    const btnCloseFriends = document.getElementById('btnCloseFriends');
+    const friendsCountSpan = document.getElementById('friendsCount');
+    let friends = [];
+
+    const knownUsers = [
+      "Karol","Wiki","Bartek","Ola","Kacper",
+      "Dominik","Matylda","Julka","Rafał","Admin",
+      "Eryk","Marek","Filip","Paulina","Sara",
+      "Alan","Kinga","Kuba","Maciek","Natalia"
+    ];
+
+    let gameLocked = false;
+    let gameMode = 'pvp';
+    let currentTurn = 'white';
+
+    // LUDO
+    const gridLudo = 15;
+    const cellLudo = size / gridLudo;
+    let ludoState = { pieces: [] };
+    const diceSize = cellLudo * 2;
+    const diceX = size - diceSize - 10;
+    const diceY = 10;
+    let ludoDice = null;
+    let ludoPlayers = [];
+    let ludoCurrentIndex = 0;
+
+    function setActiveButton() {
+      [btnChess, btnCheckers, btnLudo].forEach(b => b.classList.remove('active'));
+      if (currentGame === 'chess') btnChess.classList.add('active');
+      if (currentGame === 'checkers') btnCheckers.classList.add('active');
+      if (currentGame === 'ludo') btnLudo.classList.add('active');
+    }
+    function colorLabelPL(color) {
+      switch(color) {
+        case 'green': return 'Zielony';
+        case 'red': return 'Czerwony';
+        case 'yellow': return 'Żółty';
+        case 'blue': return 'Niebieski';
+        default: return color;
+      }
+    }
+
+    function updateTurnInfo() {
+      if (currentGame === 'chess') {
+        let base;
+        if (gameMode === 'pvp') {
+          base = 'Szachy – tura: ' + (currentTurn === 'white' ? 'Białe' : 'Czarne');
+        } else {
+          const kto = currentTurn === 'white' ? 'Ty (Białe)' : 'Bot (Czarne)';
+          base = 'Szachy – tura: ' + kto;
+        }
+        if (isKingInCheck(currentTurn)) {
+          base += ' – SZACH!';
+        }
+        turnInfo.textContent = base;
+      } else if (currentGame === 'checkers') {
+        let base;
+        if (gameMode === 'pvp') {
+          base = 'Warcaby – tura: ' + (currentTurn === 'white' ? 'Białe' : 'Czarne');
+        } else {
+          const kto = currentTurn === 'white' ? 'Ty (Białe)' : 'Bot (Czarne)';
+          base = 'Warcaby – tura: ' + kto;
+        }
+        turnInfo.textContent = base;
+      } else {
+        if (!ludoPlayers.length) {
+          turnInfo.textContent = 'Chińczyk – wybierz tryb z prawej.';
+        } else {
+          const p = ludoPlayers[ludoCurrentIndex];
+          const typ = p.type === 'human' ? 'Gracz' : 'Bot';
+          const diceText = ludoDice == null ? '-' : String(ludoDice);
+          turnInfo.textContent =
+            'Chińczyk – tura: ' + colorLabelPL(p.color) + ' (' + typ + '), kostka: ' + diceText;
+        }
+      }
+    }
+
+    /* ========= INICJALIZACJE ========= */
+    function initChess() {
+      boardState = [];
+      for (let y=0; y<grid8; y++) {
+        const row = [];
+        for (let x=0; x<grid8; x++) row.push(null);
+        boardState.push(row);
+      }
+      const backRowWhite = ['R','N','B','Q','K','B','N','R'];
+      const backRowBlack = ['r','n','b','q','k','b','n','r'];
+      for (let x=0; x<grid8; x++) {
+        boardState[7][x] = { type: backRowWhite[x], color: 'white', hasMoved: false };
+        boardState[6][x] = { type: 'P', color: 'white', hasMoved: false };
+        boardState[0][x] = { type: backRowBlack[x], color: 'black', hasMoved: false };
+        boardState[1][x] = { type: 'p', color: 'black', hasMoved: false };
+      }
+      currentTurn = 'white';
+      selected = null;
+      gameLocked = false;
+    }
+
+    function initCheckers() {
+      boardState = [];
+      for (let y=0; y<grid8; y++) {
+        const row = [];
+        for (let x=0; x<grid8; x++) row.push(null);
+        boardState.push(row);
+      }
+      for (let y=0; y<3; y++) {
+        for (let x=0; x<grid8; x++) {
+          if ((x+y)%2===1) boardState[y][x] = { color:'black', isKing:false };
+        }
+      }
+      for (let y=5; y<8; y++) {
+        for (let x=0; x<grid8; x++) {
+          if ((x+y)%2===1) boardState[y][x] = { color:'white', isKing:false };
+        }
+      }
+      currentTurn = 'white';
+      selected = null;
+      gameLocked = false;
+    }
+
+    function setupLudoPlayers(count, bots) {
+      const order = ['green','red','yellow','blue'];
+      ludoPlayers = [];
+      for (let i=0;i<count;i++) {
+        ludoPlayers.push({
+          color: order[i],
+          type: bots ? (i===0 ? 'human' : 'bot') : 'human'
+        });
+      }
+      ludoCurrentIndex = 0;
+      ludoDice = null;
+    }
+
+    function initLudo() {
+      ludoState = { pieces: [] };
+      const offset = 1;
+      // zielone
+      for (let i=0;i<4;i++){
+        ludoState.pieces.push({
+          x: offset + (i%2),
+          y: offset + Math.floor(i/2),
+          color:'green'
+        });
+      }
+      // czerwone
+      for (let i=0;i<4;i++){
+        ludoState.pieces.push({
+          x: gridLudo-2-offset+(i%2),
+          y: offset + Math.floor(i/2),
+          color:'red'
+        });
+      }
+      // niebieskie
+      for (let i=0;i<4;i++){
+        ludoState.pieces.push({
+          x: gridLudo-2-offset+(i%2),
+          y: gridLudo-2-offset+Math.floor(i/2),
+          color:'blue'
+        });
+      }
+      // żółte
+      for (let i=0;i<4;i++){
+        ludoState.pieces.push({
+          x: offset+(i%2),
+          y: gridLudo-2-offset+Math.floor(i/2),
+          color:'yellow'
+        });
+      }
+      ludoDice = null;
+      selected = null;
+      gameLocked = false;
+      if (!ludoPlayers.length) setupLudoPlayers(4,false);
+    }
+
+    /* ========= RYSOWANIE ========= */
+    function drawChessBoard() {
+      for (let y=0;y<grid8;y++){
+        for (let x=0;x<grid8;x++){
+          const isLight = (x+y)%2===0;
+          ctx.fillStyle = isLight?'#f0d9b5':'#b58863';
+          ctx.fillRect(x*cell8,y*cell8,cell8,cell8);
+        }
+      }
+      if (selected && currentGame==='chess'){
+        ctx.strokeStyle='#0f0';
+        ctx.lineWidth=4;
+        ctx.strokeRect(selected.x*cell8+2,selected.y*cell8+2,cell8-4,cell8-4);
+      }
+      ctx.font = (cell8*0.6)+'px Arial';
+      ctx.textAlign='center';
+      ctx.textBaseline='middle';
+      for (let y=0;y<grid8;y++){
+        for (let x=0;x<grid8;x++){
+          const p = boardState[y][x];
+          if(!p) continue;
+          ctx.fillStyle = p.color==='white'?'#fff':'#000';
+          ctx.fillText(pieceSymbolChess(p), x*cell8+cell8/2, y*cell8+cell8/2);
+        }
+      }
+    }
+    function pieceSymbolChess(piece){
+      const t = piece.type;
+      switch(t){
+        case 'K': return '♔';
+        case 'Q': return '♕';
+        case 'R': return '♖';
+        case 'B': return '♗';
+        case 'N': return '♘';
+        case 'P': return '♙';
+        case 'k': return '♚';
+        case 'q': return '♛';
+        case 'r': return '♜';
+        case 'b': return '♝';
+        case 'n': return '♞';
+        case 'p': return '♟';
+        default: return '?';
+      }
+    }
+
+    function drawCheckersBoard() {
+      for (let y=0;y<grid8;y++){
+        for (let x=0;x<grid8;x++){
+          const isLight = (x+y)%2===0;
+          ctx.fillStyle = isLight?'#EEEED2':'#769656';
+          ctx.fillRect(x*cell8,y*cell8,cell8,cell8);
+        }
+      }
+      if (selected && currentGame==='checkers'){
+        ctx.strokeStyle='#ff0';
+        ctx.lineWidth=4;
+        ctx.strokeRect(selected.x*cell8+2,selected.y*cell8+2,cell8-4,cell8-4);
+      }
+      for (let y=0;y<grid8;y++){
+        for (let x=0;x<grid8;x++){
+          const p = boardState[y][x];
+          if(!p) continue;
+          ctx.beginPath();
+          ctx.arc(x*cell8+cell8/2, y*cell8+cell8/2, cell8*0.35,0,Math.PI*2);
+          ctx.fillStyle = p.color==='white'?'#fff':'#000';
+          ctx.fill();
+          ctx.strokeStyle='#333';
+          ctx.stroke();
+          if (p.isKing){
+            ctx.strokeStyle='#ffd700';
+            ctx.lineWidth=3;
+            ctx.beginPath();
+            ctx.arc(x*cell8+cell8/2, y*cell8+cell8/2, cell8*0.2,0,Math.PI*2);
+            ctx.stroke();
+            ctx.lineWidth=1;
+          }
+        }
+      }
+    }
+
+    function drawLudoDice() {
+      ctx.fillStyle='#fff';
+      ctx.strokeStyle='#000';
+      ctx.lineWidth=2;
+      ctx.fillRect(diceX,diceY,diceSize,diceSize);
+      ctx.strokeRect(diceX,diceY,diceSize,diceSize);
+      ctx.fillStyle='#000';
+      ctx.font='16px Arial';
+      ctx.textAlign='center';
+      ctx.textBaseline='top';
+      ctx.fillText('KOSTKA', diceX+diceSize/2, diceY+4);
+      ctx.textBaseline='middle';
+      ctx.font='32px Arial';
+      const val = ludoDice==null?'?':String(ludoDice);
+      ctx.fillText(val, diceX+diceSize/2, diceY+diceSize/2+5);
+    }
+
+    function drawLudoBoard() {
+      ctx.fillStyle='#fff';
+      ctx.fillRect(0,0,size,size);
+      const homeSize = cellLudo*5;
+      ctx.fillStyle='rgba(0,255,0,0.35)';
+      ctx.fillRect(0,0,homeSize,homeSize);
+      ctx.fillStyle='rgba(255,0,0,0.35)';
+      ctx.fillRect(size-homeSize,0,homeSize,homeSize);
+      ctx.fillStyle='rgba(255,255,0,0.35)';
+      ctx.fillRect(0,size-homeSize,homeSize,homeSize);
+      ctx.fillStyle='rgba(0,0,255,0.35)';
+      ctx.fillRect(size-homeSize,size-homeSize,homeSize,homeSize);
+
+      const mid = Math.floor(gridLudo/2);
+      ctx.fillStyle='#ddd';
+      ctx.fillRect(mid*cellLudo,0,cellLudo,size);
+      ctx.fillRect(0,mid*cellLudo,size,cellLudo);
+
+      if (selected && currentGame==='ludo' && selected.index!=null){
+        const p = ludoState.pieces[selected.index];
+        if(p){
+          ctx.strokeStyle='#00f';
+          ctx.lineWidth=3;
+          ctx.strokeRect(p.x*cellLudo+2,p.y*cellLudo+2,cellLudo-4,cellLudo-4);
+        }
+      }
+
+      ludoState.pieces.forEach(p=>{
+        ctx.beginPath();
+        ctx.arc(p.x*cellLudo+cellLudo/2, p.y*cellLudo+cellLudo/2, cellLudo*0.35,0,Math.PI*2);
+        ctx.fillStyle=p.color;
+        ctx.fill();
+        ctx.strokeStyle='#000';
+        ctx.stroke();
+      });
+
+      drawLudoDice();
+    }
+
+    function draw() {
+      if (currentGame==='chess') drawChessBoard();
+      else if (currentGame==='checkers') drawCheckersBoard();
+      else drawLudoBoard();
+    }
+
+    /* ========= SZACHY – WALIDACJA ========= */
+    function isPathClearChess(from,to,dxStep,dyStep){
+      let x=from.x+dxStep;
+      let y=from.y+dyStep;
+      while(x!==to.x || y!==to.y){
+        if (boardState[y][x]!=null) return false;
+        x+=dxStep;
+        y+=dyStep;
+      }
+      return true;
+    }
+
+    function isLegalChessMove(from,to,piece){
+      const dx = to.x-from.x;
+      const dy = to.y-from.y;
+      const adx = Math.abs(dx);
+      const ady = Math.abs(dy);
+      if (dx===0 && dy===0) return false;
+      const target = boardState[to.y][to.x];
+      if (target && target.color===piece.color) return false;
+      const type = piece.type;
+      const isWhite = piece.color==='white';
+
+      if (type==='N' || type==='n'){
+        return (adx===1 && ady===2) || (adx===2 && ady===1);
+      }
+      if (type==='K' || type==='k'){
+        return adx<=1 && ady<=1;
+      }
+      if (type==='R' || type==='r'){
+        if (dx!==0 && dy!==0) return false;
+        const stepX = dx===0?0:dx/adx;
+        const stepY = dy===0?0:dy/ady;
+        return isPathClearChess(from,to,stepX,stepY);
+      }
+      if (type==='B' || type==='b'){
+        if (adx!==ady) return false;
+        const stepX = dx/adx;
+        const stepY = dy/ady;
+        return isPathClearChess(from,to,stepX,stepY);
+      }
+      if (type==='Q' || type==='q'){
+        if (dx===0 || dy===0){
+          const stepX = dx===0?0:dx/adx;
+          const stepY = dy===0?0:dy/ady;
+          return isPathClearChess(from,to,stepX,stepY);
+        } else if (adx===ady){
+          const stepX = dx/adx;
+          const stepY = dy/ady;
+          return isPathClearChess(from,to,stepX,stepY);
+        }
+        return false;
+      }
+      if (type==='P' || type==='p'){
+        const dir = isWhite?-1:1;
+        const startRank = isWhite?6:1;
+        const oneStepY = from.y+dir;
+        const targetEmpty = !target;
+        const forward = dx===0 && dy===dir;
+        const doubleForward = dx===0 && dy===2*dir && from.y===startRank;
+        if (forward && targetEmpty) return true;
+        if (doubleForward && targetEmpty && !boardState[oneStepY][from.x]) return true;
+        // bicie TYLKO po skosie, TYLKO gdy jest figura przeciwnika
+        if (Math.abs(dx)===1 && dy===dir && target && target.color!==piece.color) return true;
+        return false;
+      }
+      return false;
+    }
+
+    function isKingInCheck(color){
+      let kingPos = null;
+      for (let y=0;y<grid8;y++){
+        for (let x=0;x<grid8;x++){
+          const p=boardState[y][x];
+          if (p && p.color===color && (p.type==='K' || p.type==='k')){
+            kingPos={x,y};
+          }
+        }
+      }
+      if (!kingPos) return false;
+      for (let y=0;y<grid8;y++){
+        for (let x=0;x<grid8;x++){
+          const p=boardState[y][x];
+          if (p && p.color!==color){
+            if (isLegalChessMove({x,y},kingPos,p)) return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    function generateChessMoves(color){
+      const moves=[];
+      for (let y=0;y<grid8;y++){
+        for (let x=0;x<grid8;x++){
+          const p=boardState[y][x];
+          if (!p || p.color!==color) continue;
+          const from={x,y};
+          for (let ty=0;ty<grid8;ty++){
+            for (let tx=0;tx<grid8;tx++){
+              const to={x:tx,y:ty};
+              if (!isLegalChessMove(from,to,p)) continue;
+              const saveFrom=boardState[from.y][from.x];
+              const saveTo=boardState[to.y][to.x];
+              boardState[from.y][from.x]=null;
+              boardState[to.y][to.x]=p;
+              const inCheck=isKingInCheck(color);
+              boardState[from.y][from.x]=saveFrom;
+              boardState[to.y][to.x]=saveTo;
+              if (!inCheck) moves.push({from,to});
+            }
+          }
+        }
+      }
+      return moves;
+    }
+
+    function oppositeColor(c){ return c==='white'?'black':'white'; }
+
+    function checkChessEndState(){
+      const side = currentTurn; // strona, która MA ruszać
+      const moves = generateChessMoves(side);
+      const inCheck = isKingInCheck(side);
+      if (moves.length===0){
+        if (inCheck){
+          const winner = oppositeColor(side);
+          if (gameMode==='pve'){
+            if (winner==='white') showResult('win','Szach mat – pokonałeś bota!');
+            else showResult('lose','Szach mat – bot wygrał!');
+          } else {
+            showResult('win', winner==='white'?'Białe dały mata!':'Czarne dały mata!');
+          }
+        } else {
+          showResult('draw','Remis – pat (brak legalnych ruchów).');
+        }
+      }
+    }
+
+    /* ========= WARCABY ========= */
+    function hasAnyCapture(color){
+      for(let y=0;y<grid8;y++){
+        for(let x=0;x<grid8;x++){
+          const p=boardState[y][x];
+          if(!p || p.color!==color) continue;
+          if(hasCaptureFrom(x,y,p)) return true;
+        }
+      }
+      return false;
+    }
+    function hasCaptureFrom(x,y,p){
+      const dirs = p.isKing? [[1,1],[1,-1],[-1,1],[-1,-1]]
+                           : (p.color==='white'?[[1,-1],[-1,-1]]:[[1,1],[-1,1]]);
+      for (const[dX,dY] of dirs){
+        const mx=x+dX,my=y+dY, tx=x+2*dX, ty=y+2*dY;
+        if (tx<0||tx>=grid8||ty<0||ty>=grid8) continue;
+        const mid=boardState[my][mx];
+        const dst=boardState[ty][tx];
+        if (mid && mid.color!==p.color && !dst) return true;
+      }
+      return false;
+    }
+    function isLegalCheckersMove(from,to,p){
+      const dx=to.x-from.x;
+      const dy=to.y-from.y;
+      const adx=Math.abs(dx), ady=Math.abs(dy);
+      const target=boardState[to.y][to.x];
+      if(target) return false;
+      if((to.x+to.y)%2===0) return false;
+      const mustCapture=hasAnyCapture(p.color);
+      const forwardDir = p.color==='white'?-1:1;
+
+      if (adx===1 && ady===1){
+        if(mustCapture) return false;
+        if(p.isKing) return true;
+        return dy===forwardDir;
+      }
+      if (adx===2 && ady===2){
+        const mx=from.x+dx/2,my=from.y+dy/2;
+        const mid=boardState[my][mx];
+        if(!mid || mid.color===p.color) return false;
+        if (p.isKing) return true;
+        return dy===2*forwardDir;
+      }
+      return false;
+    }
+
+    function checkCheckersWin(){
+      let w=0,b=0;
+      for(let y=0;y<grid8;y++){
+        for(let x=0;x<grid8;x++){
+          const p=boardState[y][x];
+          if(!p) continue;
+          if(p.color==='white') w++; else b++;
+        }
+      }
+      if (w===0 && b>0){
+        if (gameMode==='pve') showResult('lose','Warcaby – bot zbił wszystkie Twoje pionki.');
+        else showResult('win','Czarne wygrały warcaby.');
+      } else if (b===0 && w>0){
+        if (gameMode==='pve') showResult('win','Warcaby – wygrałeś z botem!');
+        else showResult('win','Białe wygrały warcaby.');
+      }
+    }
+
+    /* ========= LUDO ========= */
+    function isInLudoBase(pos,color){
+      const x=pos.x,y=pos.y;
+      if(color==='green') return x>=1&&x<=2&&y>=1&&y<=2;
+      if(color==='red') return x>=gridLudo-3&&x<=gridLudo-2&&y>=1&&y<=2;
+      if(color==='blue') return x>=gridLudo-3&&x<=gridLudo-2&&y>=gridLudo-3&&y<=gridLudo-2;
+      if(color==='yellow') return x>=1&&x<=2&&y>=gridLudo-3&&y<=gridLudo-2;
+      return false;
+    }
+    function getLudoPieceAt(x,y){
+      return ludoState.pieces.find(p=>p.x===x && p.y===y) || null;
+    }
+    function getBaseSlots(color){
+      const arr=[];
+      const offset=1;
+      if(color==='green'){
+        for(let i=0;i<4;i++) arr.push({x:offset+(i%2), y:offset+Math.floor(i/2)});
+      } else if(color==='red'){
+        for(let i=0;i<4;i++) arr.push({x:gridLudo-2-offset+(i%2), y:offset+Math.floor(i/2)});
+      } else if(color==='blue'){
+        for(let i=0;i<4;i++) arr.push({x:gridLudo-2-offset+(i%2), y:gridLudo-2-offset+Math.floor(i/2)});
+      } else if(color==='yellow'){
+        for(let i=0;i<4;i++) arr.push({x:offset+(i%2), y:gridLudo-2-offset+Math.floor(i/2)});
+      }
+      return arr;
+    }
+    function sendPieceToBase(piece){
+      const slots=getBaseSlots(piece.color);
+      for(const s of slots){
+        const occ=getLudoPieceAt(s.x,s.y);
+        if(!occ || occ===piece){
+          piece.x=s.x; piece.y=s.y; return;
+        }
+      }
+      if(slots.length){
+        piece.x=slots[0].x; piece.y=slots[0].y;
+      }
+    }
+
+    function isLegalLudoMove(from,to,piece){
+      if(ludoDice==null) return false;
+      const dx=Math.abs(to.x-from.x);
+      const dy=Math.abs(to.y-from.y);
+      const dist=dx+dy;
+      if(dist!==ludoDice) return false;
+      if(dx!==0 && dy!==0) return false;
+      if(to.x<0||to.x>=gridLudo||to.y<0||to.y>=gridLudo) return false;
+
+      const fromBase=isInLudoBase(from,piece.color);
+      const toBase=isInLudoBase(to,piece.color);
+      if(fromBase && toBase) return false;
+      if(fromBase && !toBase && !(ludoDice===1||ludoDice===6)) return false;
+
+      // ścieżka musi być wolna od pionków po drodze
+      const stepX = dx===0?0:(to.x-from.x)/dx;
+      const stepY = dy===0?0:(to.y-from.y)/dy;
+      let x=from.x+stepX;
+      let y=from.y+stepY;
+      for(let i=1;i<dist;i++){
+        if(getLudoPieceAt(x,y)) return false;
+        x+=stepX; y+=stepY;
+      }
+      const dest=getLudoPieceAt(to.x,to.y);
+      if(dest && dest.color===piece.color) return false;
+      return true;
+    }
+
+    function checkLudoWin(){
+      // prosta meta: 2x2 środek
+      const mid=Math.floor(gridLudo/2);
+      for(const pl of ludoPlayers){
+        const c=pl.color;
+        const count=ludoState.pieces.filter(pc=>
+          pc.color===c && pc.x>=mid && pc.x<=mid+1 && pc.y>=mid && pc.y<=mid+1
+        ).length;
+        if (count>=4){
+          if(pl.type==='human') showResult('win','Chińczyk – wygrałeś kolorem: '+colorLabelPL(c));
+          else showResult('lose','Chińczyk – wygrał bot: '+colorLabelPL(c));
+        }
+      }
+    }
+
+    function ludoCurrentPlayer(){
+      if(!ludoPlayers.length) return null;
+      return ludoPlayers[ludoCurrentIndex];
+    }
+    function ludoNextTurn(){
+      if(!ludoPlayers.length) return;
+      ludoCurrentIndex=(ludoCurrentIndex+1)%ludoPlayers.length;
+      ludoDice=null;
+      selected=null;
+      updateTurnInfo();
+      draw();
+      const p=ludoCurrentPlayer();
+      if(p && p.type==='bot') setTimeout(ludoBotTurn,500);
+    }
+    function ludoBotTurn(){
+      const p=ludoCurrentPlayer();
+      if(!p || p.type!=='bot') return;
+      ludoDice=1+Math.floor(Math.random()*6);
+      updateTurnInfo();
+      draw();
+      const moves=[];
+      const captureMoves=[];
+      ludoState.pieces.forEach((piece,idx)=>{
+        if(piece.color!==p.color) return;
+        const from={x:piece.x,y:piece.y};
+        const targets=[
+          {x:from.x+ludoDice,y:from.y},
+          {x:from.x-ludoDice,y:from.y},
+          {x:from.x,y:from.y+ludoDice},
+          {x:from.x,y:from.y-ludoDice}
+        ];
+        targets.forEach(to=>{
+          if(to.x<0||to.x>=gridLudo||to.y<0||to.y>=gridLudo) return;
+          if(!isLegalLudoMove(from,to,piece)) return;
+          const enemyThere=getLudoPieceAt(to.x,to.y);
+          const obj={index:idx,from,to,capture:enemyThere && enemyThere.color!==piece.color};
+          moves.push(obj);
+          if(obj.capture) captureMoves.push(obj);
+        });
+      });
+      if(!moves.length){
+        ludoDice=null;
+        ludoNextTurn();
+        return;
+      }
+      const move = captureMoves.length ? captureMoves[Math.floor(Math.random()*captureMoves.length)]
+                                      : moves[Math.floor(Math.random()*moves.length)];
+      const piece=ludoState.pieces[move.index];
+      const enemy=getLudoPieceAt(move.to.x,move.to.y);
+      if(enemy && enemy.color!==piece.color) sendPieceToBase(enemy);
+      piece.x=move.to.x; piece.y=move.to.y;
+      ludoDice=null;
+      draw();
+      checkLudoWin();
+      ludoNextTurn();
+    }
+
+    /* ========= KLIK NA CANVAS ========= */
+    canvas.addEventListener('click',(e)=>{
+      const r=canvas.getBoundingClientRect();
+      const xPix=e.clientX-r.left;
+      const yPix=e.clientY-r.top;
+
+      if (gameMode==='pve' && (currentGame==='chess'||currentGame==='checkers') && currentTurn==='black'){
+        return;
+      }
+
+      if (currentGame==='ludo'){
+        const player=ludoCurrentPlayer();
+        if(!player) return;
+        if(xPix>=diceX && xPix<=diceX+diceSize && yPix>=diceY && yPix<=diceY+diceSize){
+          if(player.type!=='human') return;
+          rollLudoDice();
+          draw();
+          updateTurnInfo();
+          return;
+        }
+      }
+
+      if(currentGame==='chess'||currentGame==='checkers'){
+        const x=Math.floor(xPix/cell8);
+        const y=Math.floor(yPix/cell8);
+        handleClickGrid8(x,y);
+      } else {
+        const x=Math.floor(xPix/cellLudo);
+        const y=Math.floor(yPix/cellLudo);
+        handleClickLudo(x,y);
+      }
+      draw();
+      updateTurnInfo();
+    });
+
+    function handleClickGrid8(x,y){
+      if(x<0||x>=grid8||y<0||y>=grid8) return;
+      if(!selected){
+        const p=boardState[y][x];
+        if(!p) return;
+        if(gameMode==='pvp'){
+          if(p.color!==currentTurn) return;
+        }else{
+          if(p.color!=='white' || currentTurn!=='white') return;
+        }
+        selected={x,y};
+      }else{
+        const from=selected;
+        if(from.x===x && from.y===y){selected=null;return;}
+        const p=boardState[from.y][from.x];
+        if(!p){selected=null;return;}
+        const to={x,y};
+        let legal=true;
+        if(currentGame==='chess') legal=isLegalChessMove(from,to,p);
+        else legal=isLegalCheckersMove(from,to,p);
+        if(!legal){selected=null;return;}
+
+        if(currentGame==='chess'){
+          const saveFrom=boardState[from.y][from.x];
+          const saveTo=boardState[to.y][to.x];
+          boardState[from.y][from.x]=null;
+          boardState[to.y][to.x]=p;
+          if(isKingInCheck(p.color)){
+            boardState[from.y][from.x]=saveFrom;
+            boardState[to.y][to.x]=saveTo;
+            selected=null;
+            return;
+          }
+        }
+
+        if(currentGame==='checkers'){
+          const dx=to.x-from.x, dy=to.y-from.y;
+          if(Math.abs(dx)===2 && Math.abs(dy)===2){
+            const mx=from.x+dx/2,my=from.y+dy/2;
+            boardState[my][mx]=null;
+          }
+        }
+
+        boardState[from.y][from.x]=null;
+        boardState[y][x]=p;
+
+        if(currentGame==='checkers'){
+          if(p.color==='white' && y===0) p.isKing=true;
+          if(p.color==='black' && y===7) p.isKing=true;
+        }
+        if(currentGame==='chess') p.hasMoved=true;
+
+        selected=null;
+        gameLocked=true;
+
+        if(gameMode==='pvp'){
+          currentTurn = currentTurn==='white'?'black':'white';
+          if(currentGame==='chess') checkChessEndState();
+          else checkCheckersWin();
+        }else{
+          // PVE: po ruchu gracza
+          if(currentGame==='chess'){
+            currentTurn='black';
+            draw(); updateTurnInfo();
+            setTimeout(botMove,300);
+          }else{
+            currentTurn='black';
+            draw(); updateTurnInfo();
+            setTimeout(botMove,300);
+          }
+        }
+      }
+    }
+
+    function handleClickLudo(x,y){
+      if(x<0||x>=gridLudo||y<0||y>=gridLudo) return;
+      const player=ludoCurrentPlayer();
+      if(!player || player.type!=='human') return;
+      if(!selected){
+        const idx=ludoState.pieces.findIndex(p=>p.x===x && p.y===y && p.color===player.color);
+        if(idx!==-1) selected={x,y,index:idx};
+      }else{
+        const idx=selected.index;
+        const piece=ludoState.pieces[idx];
+        if(!piece || piece.color!==player.color){selected=null;return;}
+        const from={x:piece.x,y:piece.y};
+        const to={x,y};
+        if(!isLegalLudoMove(from,to,piece)){selected=null;return;}
+        const enemy=getLudoPieceAt(x,y);
+        if(enemy && enemy.color!==piece.color) sendPieceToBase(enemy);
+        piece.x=x; piece.y=y;
+        selected=null;
+        ludoDice=null;
+        gameLocked=true;
+        draw();
+        checkLudoWin();
+        ludoNextTurn();
+      }
+    }
+
+    function rollLudoDice(){
+      if(currentGame!=='ludo') return;
+      if(ludoDice!=null) return;
+      const p=ludoCurrentPlayer();
+      if(!p || p.type!=='human') return;
+      ludoDice=1+Math.floor(Math.random()*6);
+      gameLocked=true;
+      updateTurnInfo();
+    }
+
+    /* ========= BOT SZACHY/WARCABY ========= */
+    function generateCheckersMoves(color){
+      const moves=[];
+      const mustCapture=hasAnyCapture(color);
+      for(let y=0;y<grid8;y++){
+        for(let x=0;x<grid8;x++){
+          const p=boardState[y][x];
+          if(!p || p.color!==color) continue;
+          const from={x,y};
+          for(let ty=0;ty<grid8;ty++){
+            for(let tx=0;tx<grid8;tx++){
+              const to={x:tx,y:ty};
+              if(!isLegalCheckersMove(from,to,p)) continue;
+              const dx=to.x-from.x,dy=to.y-from.y;
+              const isCapture=Math.abs(dx)===2 && Math.abs(dy)===2;
+              if(mustCapture && !isCapture) continue;
+              moves.push({from,to});
+            }
+          }
+        }
+      }
+      return moves;
+    }
+
+    function botMove(){
+      if(gameMode!=='pve') return;
+      if(currentTurn!=='black') return;
+      if(currentGame==='chess'){
+        const moves=generateChessMoves('black');
+        if(!moves.length){
+          // brak ruchu – sprawdź czy mat / pat
+          checkChessEndState();
+          return;
+        }
+        const m=moves[Math.floor(Math.random()*moves.length)];
+        const p=boardState[m.from.y][m.from.x];
+        boardState[m.from.y][m.from.x]=null;
+        boardState[m.to.y][m.to.x]=p;
+        p.hasMoved=true;
+        currentTurn='white';
+        draw();
+        checkChessEndState();
+        updateTurnInfo();
+      }else if(currentGame==='checkers'){
+        const moves=generateCheckersMoves('black');
+        if(!moves.length){
+          currentTurn='white';
+          checkCheckersWin();
+          updateTurnInfo();
+          return;
+        }
+        const m=moves[Math.floor(Math.random()*moves.length)];
+        const p=boardState[m.from.y][m.from.x];
+        const dx=m.to.x-m.from.x,dy=m.to.y-m.from.y;
+        if(Math.abs(dx)===2 && Math.abs(dy)===2){
+          const mx=m.from.x+dx/2,my=m.from.y+dy/2;
+          boardState[my][mx]=null;
+        }
+        boardState[m.from.y][m.from.x]=null;
+        boardState[m.to.y][m.to.x]=p;
+        if(p.color==='white' && m.to.y===0) p.isKing=true;
+        if(p.color==='black' && m.to.y===7) p.isKing=true;
+        currentTurn='white';
+        draw();
+        checkCheckersWin();
+        updateTurnInfo();
+      }
+    }
+
+    /* ========= PRZEŁĄCZANIE GIER / TRYBÓW ========= */
+    btnChess.addEventListener('click',()=>{
+      if(gameLocked && currentGame!=='chess'){
+        alert('Nie możesz zmienić gry w trakcie rundy. Użyj „PODDAJ SIĘ”.');
+        return;
+      }
+      currentGame='chess';
+      initChess();
+      ludoModesDiv.style.display='none';
+      setActiveButton();
+      updateTurnInfo();
+      draw();
+    });
+    btnCheckers.addEventListener('click',()=>{
+      if(gameLocked && currentGame!=='checkers'){
+        alert('Nie możesz zmienić gry w trakcie rundy. Użyj „PODDAJ SIĘ”.');
+        return;
+      }
+      currentGame='checkers';
+      initCheckers();
+      ludoModesDiv.style.display='none';
+      setActiveButton();
+      updateTurnInfo();
+      draw();
+    });
+    btnLudo.addEventListener('click',()=>{
+      if(gameLocked && currentGame!=='ludo'){
+        alert('Nie możesz zmienić gry w trakcie rundy. Użyj „PODDAJ SIĘ”.');
+        return;
+      }
+      currentGame='ludo';
+      initLudo();
+      ludoModesDiv.style.display='block';
+      setActiveButton();
+      updateTurnInfo();
+      draw();
+    });
+
+    btnPvp.addEventListener('click',()=>{
+      if(gameLocked && gameMode!=='pvp'){
+        alert('Nie możesz zmienić trybu w trakcie rundy. Użyj „PODDAJ SIĘ”.');
+        return;
+      }
+      gameMode='pvp';
+      currentTurn='white';
+      btnPvp.classList.add('active');
+      btnPve.classList.remove('active');
+      updateTurnInfo();
+    });
+    btnPve.addEventListener('click',()=>{
+      if(gameLocked && gameMode!=='pve'){
+        alert('Nie możesz zmienić trybu w trakcie rundy. Użyj „PODDAJ SIĘ”.');
+        return;
+      }
+      gameMode='pve';
+      currentTurn='white';
+      btnPve.classList.add('active');
+      btnPvp.classList.remove('active');
+      updateTurnInfo();
+    });
+
+    btnResign.addEventListener('click',()=>{
+      if(!gameLocked){
+        alert('Jeszcze nie zacząłeś rundy!');
+        return;
+      }
+      showResult('lose','Poddanie się – runda zakończona.');
+      if(currentGame==='chess') initChess();
+      else if(currentGame==='checkers') initCheckers();
+      else initLudo();
+      gameLocked=false;
+      selected=null;
+      currentTurn='white';
+      updateTurnInfo();
+      draw();
+    });
+
+    function ensureLudoChange(){
+      if(currentGame!=='ludo') return false;
+      if(gameLocked){
+        alert('Nie możesz zmienić trybu Chińczyka w trakcie rundy. Użyj „PODDAJ SIĘ”.');
+        return false;
+      }
+      return true;
+    }
+    lmP4.addEventListener('click',()=>{ if(!ensureLudoChange())return; setupLudoPlayers(4,false); updateTurnInfo(); draw(); });
+    lmP3.addEventListener('click',()=>{ if(!ensureLudoChange())return; setupLudoPlayers(3,false); updateTurnInfo(); draw(); });
+    lmP2.addEventListener('click',()=>{ if(!ensureLudoChange())return; setupLudoPlayers(2,false); updateTurnInfo(); draw(); });
+    lmB4.addEventListener('click',()=>{ if(!ensureLudoChange())return; setupLudoPlayers(4,true); updateTurnInfo(); draw(); const p=ludoCurrentPlayer(); if(p&&p.type==='bot') ludoBotTurn(); });
+    lmB3.addEventListener('click',()=>{ if(!ensureLudoChange())return; setupLudoPlayers(3,true); updateTurnInfo(); draw(); const p=ludoCurrentPlayer(); if(p&&p.type==='bot') ludoBotTurn(); });
+    lmB2.addEventListener('click',()=>{ if(!ensureLudoChange())return; setupLudoPlayers(2,true); updateTurnInfo(); draw(); const p=ludoCurrentPlayer(); if(p&&p.type==='bot') ludoBotTurn(); });
+
+    /* ========= ZASADY ========= */
+    btnRulesChess.addEventListener('click',()=>{
+      rulesBox.style.display='block';
+      rulesBox.innerHTML=`
+        <h2>Zasady Szachów (skrót)</h2>
+        <p>• Celem jest danie mata królowi przeciwnika (SZACH MAT).</p>
+        <p>• Pionek <b>NIE</b> bije do przodu – tylko po skosie, jeśli stoi tam figura przeciwnika.</p>
+        <p>• Nie możesz wykonać ruchu, po którym Twój król jest pod szachem.</p>
+        <p>• Gdy strona, która jest pod szachem, nie ma żadnego legalnego ruchu – to SZACH MAT.</p>
+        <p>• Gdy strona nie ma żadnego legalnego ruchu, ale król nie jest pod szachem – to PAT (remis).</p>
+      `;
+    });
+    btnRulesCheckers.addEventListener('click',()=>{
+      rulesBox.style.display='block';
+      rulesBox.innerHTML=`
+        <h2>Zasady Warcabów (skrót)</h2>
+        <p>• Gramy na ciemnych polach planszy 8×8.</p>
+        <p>• Pionek porusza się po skosie o jedno pole do przodu, bije skokiem o 2 pola.</p>
+        <p>• Gdy możliwe jest bicie – <b>musisz</b> bić.</p>
+        <p>• Po dojściu do ostatniego rzędu pionek staje się damką (może chodzić w obie strony).</p>
+        <p>• Wygrywa ten, kto zbije wszystkie pionki przeciwnika.</p>
+      `;
+    });
+    btnRulesLudo.addEventListener('click',()=>{
+      rulesBox.style.display='block';
+      rulesBox.innerHTML=`
+        <h2>Zasady Chińczyka (skrót)</h2>
+        <p>• Każdy kolor ma 4 pionki w swojej bazie.</p>
+        <p>• Kostka (1–6) jest narysowana na planszy – kliknij, aby rzucić.</p>
+        <p>• Z bazy możesz wyjść TYLKO na wyniku 1 lub 6.</p>
+        <p>• Poruszasz się w linii prostej (góra/dół/lewo/prawo) o tyle pól, ile pokazuje kostka.</p>
+        <p>• Nie przeskakujesz przez pionki – droga musi być wolna.</p>
+        <p>• Wejście na pionek przeciwnika odsyła go do jego bazy.</p>
+        <p>• Środek (2×2) to meta – gdy wszystkie 4 pionki koloru są w mecie, ten kolor wygrywa.</p>
+      `;
+    });
+
+    /* ========= ZNAJOMI ========= */
+    function loadFriends(){
+      const saved=localStorage.getItem('rolexFriends');
+      if(!saved){ friends=[]; }
+      else{
+        try{
+          friends=JSON.parse(saved);
+          if(!Array.isArray(friends)) friends=[];
+        }catch(e){ friends=[]; }
+      }
+      renderFriends();
+    }
+    function saveFriends(){
+      localStorage.setItem('rolexFriends',JSON.stringify(friends));
+    }
+    function renderFriends(){
+      friendsListDiv.innerHTML='';
+      if(!friends.length){
+        friendsListDiv.innerHTML='<p>Brak znajomych. Dodaj kogoś 👇</p>';
+      }else{
+        friends.forEach((name,idx)=>{
+          const row=document.createElement('div');
+          row.className='friend-item';
+          const span=document.createElement('span');
+          span.className='friend-name';
+          span.textContent=name;
+          const btn=document.createElement('button');
+          btn.className='friend-remove';
+          btn.textContent='X';
+          btn.addEventListener('click',()=>{
+            friends.splice(idx,1);
+            saveFriends();
+            renderFriends();
+          });
+          row.appendChild(span);
+          row.appendChild(btn);
+          friendsListDiv.appendChild(row);
+        });
+      }
+      friendsCountSpan.textContent=friends.length + (friends.length===1?' znajomy':' znajomych');
+    }
+
+    btnFriends.addEventListener('click',()=>{
+      friendsPanel.style.display = (friendsPanel.style.display==='block'?'none':'block');
+      friendNameInput.focus();
+    });
+    btnCloseFriends.addEventListener('click',()=>{
+      friendsPanel.style.display='none';
+    });
+
+    btnAddFriend.addEventListener('click',()=>{
+      const nick=friendNameInput.value.trim();
+      if(!nick){
+        alert('Wpisz nazwę znajomego!');
+        return;
+      }
+      if(!knownUsers.includes(nick)){
+        alert('❗ Nie ma takiego gracza o tej nazwie!');
+        return;
+      }
+      if(friends.includes(nick)){
+        alert('Ten znajomy już jest na liście!');
+        return;
+      }
+      friends.push(nick);
+      saveFriends();
+      renderFriends();
+      friendNameInput.value='';
+    });
+    friendNameInput.addEventListener('keydown',(e)=>{
+      if(e.key==='Enter') btnAddFriend.click();
+    });
+
+    /* ========= START ========= */
+    initChess();
+    ludoModesDiv.style.display='none';
+    setActiveButton();
+    loadFriends();
+    updateTurnInfo();
+    draw();
+  </script>
+</body>
+</html>
